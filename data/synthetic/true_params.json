@@ -1,0 +1,128 @@
+{
+  "rng_seed": 42,
+  "n_weeks": 260,
+  "start_date": "2020-01-06",
+  "media_channels": [
+    "PPC_Brand",
+    "PPC_Generic",
+    "Display",
+    "Social",
+    "TV",
+    "OOH",
+    "Meta",
+    "Yahoo"
+  ],
+  "spend_columns": [
+    "PPC_Brand_Spend",
+    "PPC_Generic_Spend",
+    "Display_Spend",
+    "Social_Spend",
+    "TV_Spend",
+    "OOH_Spend",
+    "Meta_Spend",
+    "Yahoo_Spend"
+  ],
+  "control_columns": [
+    "competitor_spend",
+    "google_trend_competitor"
+  ],
+  "kpi_columns": [
+    "opportunities",
+    "sales"
+  ],
+  "channel_adstock_alpha": {
+    "PPC_Brand": 0.55,
+    "PPC_Generic": 0.35,
+    "Display": 0.25,
+    "Social": 0.3,
+    "TV": 0.75,
+    "OOH": 0.7,
+    "Meta": 0.28,
+    "Yahoo": 0.2
+  },
+  "channel_hill_slope": {
+    "PPC_Brand": 1.8,
+    "PPC_Generic": 1.4,
+    "Display": 1.2,
+    "Social": 1.3,
+    "TV": 1.5,
+    "OOH": 1.4,
+    "Meta": 1.3,
+    "Yahoo": 1.1
+  },
+  "channel_hill_half_sat": {
+    "PPC_Brand": 0.35,
+    "PPC_Generic": 0.55,
+    "Display": 0.9,
+    "Social": 0.6,
+    "TV": 0.5,
+    "OOH": 0.55,
+    "Meta": 0.58,
+    "Yahoo": 0.65
+  },
+  "channel_beta": {
+    "PPC_Brand": 420.0,
+    "PPC_Generic": 280.0,
+    "Display": 350.0,
+    "Social": 220.0,
+    "TV": 180.0,
+    "OOH": 120.0,
+    "Meta": 200.0,
+    "Yahoo": 80.0
+  },
+  "channel_adstock_scale_max": {
+    "PPC_Brand": 94845.62265009798,
+    "PPC_Generic": 58454.124950388556,
+    "Display": 26767.50915199863,
+    "Social": 20918.67479440113,
+    "TV": 175167.34217361227,
+    "OOH": 61394.962473694744,
+    "Meta": 37051.197302653076,
+    "Yahoo": 9723.906321041553
+  },
+  "baseline": {
+    "intercept": 800.0,
+    "fourier_order": 2,
+    "fourier_coefs": [
+      [
+        120.0,
+        0.0
+      ],
+      [
+        60.0,
+        40.0
+      ]
+    ],
+    "q4_boost": 180.0
+  },
+  "control_gamma": {
+    "competitor_spend": -0.0008,
+    "google_trend_competitor": 15.0
+  },
+  "true_close_rate": 0.12,
+  "opportunities_noise_std": 45.0,
+  "sales_noise_std": 8.0,
+  "spend_simulation": {
+    "base_level": {
+      "PPC_Brand": 18000.0,
+      "PPC_Generic": 12000.0,
+      "Display": 8000.0,
+      "Social": 6000.0,
+      "TV": 25000.0,
+      "OOH": 10000.0,
+      "Meta": 7000.0,
+      "Yahoo": 2500.0
+    },
+    "log_sigma": 0.12,
+    "seasonal_amplitude": 0.15,
+    "ar_phi": 0.65,
+    "pulse_prob": 0.04,
+    "pulse_scale": 1.8
+  },
+  "competitor_spend_base": 45000.0,
+  "competitor_spend_sigma": 0.1,
+  "google_trend_base": 50.0,
+  "google_trend_sigma": 8.0,
+  "google_trend_ar": 0.8,
+  "seed_used": 42
+}
