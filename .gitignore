@@ -1,0 +1,16 @@
+#Python Virtual Environment
+.venv/
+
+
+#IDE Setting
+.idea/
+
+#Python automatic cache
+**/__pycache__/
+**.pyc
+
+#Data Outputs
+data/synthetic/*.csv
+
+#Jupyter Notebook checkpoints
+**/.ipynb_checkpoints/
