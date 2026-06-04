@@ -14,3 +14,6 @@ data/synthetic/*.csv
 
 #Jupyter Notebook checkpoints
 **/.ipynb_checkpoints/
+
+#Supabase Public Key and API
+.env
