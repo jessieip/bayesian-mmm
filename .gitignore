@@ -24,3 +24,7 @@ notebooks/*.png
 #ruff mypy cache
 .ruff_cache/
 .mypy_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc
