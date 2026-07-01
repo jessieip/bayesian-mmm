@@ -1,9 +1,10 @@
-"""Shared pytest fixtures for database tests."""
+"""Shared pytest fixtures."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 
 
@@ -51,3 +52,35 @@ def build_mock_client(data: list[dict]) -> MagicMock:
         data=data
     )
     return client
+
+
+@pytest.fixture
+def sample_mmm_dataframe() -> pd.DataFrame:
+    """Minimal weekly panel matching Supabase schema (2 rows, 4 channels)."""
+    return pd.DataFrame(
+        {
+            "date": ["2026-06-01", "2026-06-08"],
+            "PPC_Brand_Spend": [1000.0, 1000.0],
+            "Display_Spend": [500.0, 500.0],
+            "Meta_Spend": [300.0, 300.0],
+            "Yahoo_Spend": [200.0, 200.0],
+            "competitor_spend": [9999.0, 9999.0],
+            "opportunities": [50.0, 60.0],
+            "sales": [6.0, 7.0],
+        }
+    )
+
+
+@pytest.fixture
+def zero_spend_dataframe() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "PPC_Brand_Spend": [0.0, 0.0],
+            "Display_Spend": [0.0, 0.0],
+        }
+    )
+
+
+@pytest.fixture
+def no_spend_dataframe() -> pd.DataFrame:
+    return pd.DataFrame({"date": ["2026-06-01"], "sales": [10.0]})
