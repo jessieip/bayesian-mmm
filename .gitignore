@@ -17,3 +17,16 @@ data/synthetic/*.csv
 
 #Supabase Public Key and API
 .env
+
+#Notebook pictures
+notebooks/*.png
+
+#ruff mypy cache
+.ruff_cache/
+.mypy_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+src/bayesian_mmm/transforms/__pycache__/*.pyc
