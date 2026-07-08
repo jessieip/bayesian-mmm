@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 from unittest.mock import MagicMock
 
+import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
+
+from mmm_model_prior import CHANNEL_COLUMNS, CONTROL_COLUMNS, N_CHANNELS
 
 
 def _base_row(date: str, spend_multiplier: float = 1.0) -> dict:
@@ -84,3 +92,37 @@ def zero_spend_dataframe() -> pd.DataFrame:
 @pytest.fixture
 def no_spend_dataframe() -> pd.DataFrame:
     return pd.DataFrame({"date": ["2026-06-01"], "sales": [10.0]})
+
+
+@pytest.fixture
+def full_mmm_dataset() -> pd.DataFrame:
+    """Weekly panel with all 8 channels + controls (4 rows for plotting)."""
+    rows = [
+        _base_row("2026-01-06", 1.0),
+        _base_row("2026-01-13", 1.05),
+        _base_row("2026-01-20", 0.95),
+        _base_row("2026-01-27", 1.1),
+    ]
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+@pytest.fixture
+def valid_prior_sigma() -> list[float]:
+    return [1.0] * N_CHANNELS
+
+
+def build_mock_mmm(n_dates: int, *, n_chains: int = 2, n_draws: int = 5) -> MagicMock:
+    """Minimal MMM mock for prior predictive plotting tests."""
+    dates = pd.date_range("2026-01-06", periods=n_dates, freq="W-MON")
+    y_prior = xr.DataArray(
+        np.ones((n_chains, n_draws, n_dates)) * 100.0,
+        dims=["chain", "draw", "date"],
+        coords={"chain": range(n_chains), "draw": range(n_draws), "date": dates},
+    )
+
+    mock_mmm = MagicMock()
+    mock_mmm.model.coords = {"date": dates}
+    mock_mmm.idata.prior = {"y_original_scale": y_prior}
+    return mock_mmm
