@@ -46,3 +46,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "slow: real PyMC prior predictive (optional, not for CI)",
+]
