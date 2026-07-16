@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+import matplotlib.pyplot as plt
 
 from mmm_model_prior import CHANNEL_COLUMNS, CONTROL_COLUMNS, N_CHANNELS
 
@@ -32,6 +33,12 @@ def _base_row(date: str, spend_multiplier: float = 1.0) -> dict:
         "opportunities": 100.0 * spend_multiplier,
         "sales": 12.0 * spend_multiplier,
     }
+
+@pytest.fixture(autouse=True)
+def close_plots():
+    yield
+    plt.close("all")
+
 
 
 @pytest.fixture
