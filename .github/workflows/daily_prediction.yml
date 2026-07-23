@@ -1,0 +1,136 @@
+# Daily Bayesian MMM prediction pipeline.
+#
+# Runs scripts/run_pipeline_test.py on a schedule (and via workflow_dispatch).
+# Default sampler settings are SMOKE (2 chains x 50 draws), not production 4x1000.
+#
+# Required repo secrets:
+#   SUPABASE_URL
+#   SUPABASE_KEY
+#
+# Cron is UTC: "0 9 * * *" = 09:00 UTC daily.
+
+name: Daily MMM Prediction
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      prior_samples:
+        description: "Prior predictive samples"
+        required: false
+        default: "50"
+        type: string
+      chains:
+        description: "MCMC chains"
+        required: false
+        default: "2"
+        type: string
+      draws:
+        description: "MCMC draws per chain"
+        required: false
+        default: "50"
+        type: string
+      n_new:
+        description: "Out-of-sample horizon (weeks)"
+        required: false
+        default: "5"
+        type: string
+      skip_predict:
+        description: "Skip in-sample predict / sensitivity charts"
+        required: false
+        default: false
+        type: boolean
+      skip_roas:
+        description: "Skip ROAS charts"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry and virtualenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            ./.venv
+          key: poetry-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Write .env from GitHub Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "SUPABASE_URL and SUPABASE_KEY secrets must be set"
+            exit 1
+          fi
+          printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\n' "$SUPABASE_URL" "$SUPABASE_KEY" > .env
+
+      - name: Resolve pipeline parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "prior_samples=${{ inputs.prior_samples }}" >> "$GITHUB_OUTPUT"
+            echo "chains=${{ inputs.chains }}" >> "$GITHUB_OUTPUT"
+            echo "draws=${{ inputs.draws }}" >> "$GITHUB_OUTPUT"
+            echo "n_new=${{ inputs.n_new }}" >> "$GITHUB_OUTPUT"
+            echo "skip_predict=${{ inputs.skip_predict }}" >> "$GITHUB_OUTPUT"
+            echo "skip_roas=${{ inputs.skip_roas }}" >> "$GITHUB_OUTPUT"
+          else
+            # Scheduled run: smoke defaults (not production 4x1000)
+            echo "prior_samples=50" >> "$GITHUB_OUTPUT"
+            echo "chains=2" >> "$GITHUB_OUTPUT"
+            echo "draws=50" >> "$GITHUB_OUTPUT"
+            echo "n_new=5" >> "$GITHUB_OUTPUT"
+            echo "skip_predict=false" >> "$GITHUB_OUTPUT"
+            echo "skip_roas=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run daily MMM pipeline
+        run: |
+          EXTRA_FLAGS=""
+          if [ "${{ steps.params.outputs.skip_predict }}" = "true" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --skip-predict"
+          fi
+          if [ "${{ steps.params.outputs.skip_roas }}" = "true" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --skip-roas"
+          fi
+
+          echo "SMOKE/manual sampler: prior_samples=${{ steps.params.outputs.prior_samples }} chains=${{ steps.params.outputs.chains }} draws=${{ steps.params.outputs.draws }} n_new=${{ steps.params.outputs.n_new }}"
+
+          poetry run python scripts/run_pipeline_test.py \
+            --prior-samples "${{ steps.params.outputs.prior_samples }}" \
+            --chains "${{ steps.params.outputs.chains }}" \
+            --draws "${{ steps.params.outputs.draws }}" \
+            --n-new "${{ steps.params.outputs.n_new }}" \
+            $EXTRA_FLAGS
+
+      - name: Clean up .env
+        if: always()
+        run: rm -f .env
