@@ -14,11 +14,13 @@ import xarray as xr
 from mmm_model_prior import CHANNEL_COLUMNS, CONTROL_COLUMNS, mmm_model_prior
 from mmm_model_train import mmm_model_train
 from out_sample_predict import (
+    DEFAULT_HDI_PROB,
     DEFAULT_N_NEW,
     DEFAULT_N_POINTS,
     build_x_for_prediction,
     build_x_out_of_sample,
     out_sample_predict,
+    summarize_out_of_sample,
     y_original_scale_from_predictive,
 )
 
@@ -173,6 +175,52 @@ class TestYOriginalScaleFromPredictive:
         result = y_original_scale_from_predictive({"y_original_scale": y_scale})
         assert result.dims[-1] == "date"
         assert result.shape[-1] == 2
+
+
+class TestSummarizeOutOfSample:
+    def _fake_hdi(self, data, hdi_prob=DEFAULT_HDI_PROB):
+        dates = pd.DatetimeIndex(pd.to_datetime(data.coords["date"].values))
+        lower = xr.DataArray(
+            np.full(len(dates), 90.0),
+            dims=["date"],
+            coords={"date": dates},
+            name="y_original_scale",
+        )
+        upper = xr.DataArray(
+            np.full(len(dates), 110.0),
+            dims=["date"],
+            coords={"date": dates},
+            name="y_original_scale",
+        )
+        return xr.concat([lower, upper], dim=pd.Index(["lower", "higher"], name="hdi"))
+
+    @patch("out_sample_predict.az.hdi")
+    def test_returns_mean_and_hdi_columns(self, mock_hdi):
+        dates = pd.date_range("2026-02-03", periods=2, freq="W-MON")
+        mock_hdi.side_effect = self._fake_hdi
+        x_oos = pd.DataFrame({"date": dates})
+        predictive = fake_posterior_predictive(dates, value=100.0)
+
+        summary = summarize_out_of_sample(x_oos, predictive)
+
+        assert list(summary.columns) == ["date", "mean", "hdi_lower", "hdi_upper"]
+        assert len(summary) == 2
+        assert summary["mean"].tolist() == [100.0, 100.0]
+        assert summary["hdi_lower"].tolist() == [90.0, 90.0]
+        assert summary["hdi_upper"].tolist() == [110.0, 110.0]
+        mock_hdi.assert_called_once()
+        assert mock_hdi.call_args.kwargs["hdi_prob"] == DEFAULT_HDI_PROB
+
+    @patch("out_sample_predict.az.hdi")
+    def test_forwards_custom_hdi_prob(self, mock_hdi):
+        dates = pd.date_range("2026-02-03", periods=1, freq="W-MON")
+        mock_hdi.side_effect = self._fake_hdi
+        summarize_out_of_sample(
+            pd.DataFrame({"date": dates}),
+            fake_posterior_predictive(dates),
+            hdi_prob=0.89,
+        )
+        assert mock_hdi.call_args.kwargs["hdi_prob"] == 0.89
 
 
 class TestReturnTuple:
