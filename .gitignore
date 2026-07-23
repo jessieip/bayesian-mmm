@@ -30,3 +30,5 @@ __pycache__/
 *.pyc
 
 src/bayesian_mmm/transforms/__pycache__/*.pyc
+
+.streamlit/secrets.toml

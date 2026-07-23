@@ -15,6 +15,7 @@ from pymc_marketing.mmm.multidimensional import MMM
 logger = logging.getLogger(__name__)
 DEFAULT_N_POINTS: int = 15
 DEFAULT_N_NEW: int = 5
+DEFAULT_HDI_PROB: float = 0.94
 
 
 def build_x_out_of_sample(
@@ -102,6 +103,75 @@ def y_original_scale_from_predictive(y_out_of_sample: Any) -> xr.DataArray:
     return da.unstack().transpose(..., "date")
 
 
+def _forecast_y_scale(
+    x_out_of_sample: pd.DataFrame,
+    y_out_original_scale: xr.DataArray,
+) -> tuple[pd.DatetimeIndex, xr.DataArray]:
+    """Restrict predictive scale to dates overlapping ``x_out_of_sample``."""
+    forecast_dates = pd.DatetimeIndex(pd.to_datetime(x_out_of_sample["date"]))
+    y_scale = y_out_original_scale
+    if "date" not in y_scale.dims:
+        raise ValueError("Predictive y_original_scale must include a 'date' dimension")
+
+    y_scale = y_scale.assign_coords(date=pd.to_datetime(y_scale.coords["date"].values))
+    overlap = pd.DatetimeIndex(y_scale.coords["date"].values).intersection(
+        forecast_dates
+    )
+    if len(overlap) == 0:
+        raise ValueError(
+            "No overlapping dates between predictive output and "
+            f"x_out_of_sample. predictive={list(y_scale.coords['date'].values)} "
+            f"forecast={list(forecast_dates)}"
+        )
+    return overlap, y_scale.sel(date=overlap)
+
+
+def summarize_out_of_sample(
+    x_out_of_sample: pd.DataFrame,
+    y_out_of_sample: Any,
+    *,
+    hdi_prob: float = DEFAULT_HDI_PROB,
+) -> pd.DataFrame:
+    """
+    Build a table of forecast mean and HDI for Supabase ``predictions``.
+
+    Returns a DataFrame with columns ``date``, ``mean``, ``hdi_lower``,
+    ``hdi_upper``. HDI uses ArviZ's default-style interval (``hdi_prob=0.94``
+    unless overridden).
+    """
+    y_out_original_scale = y_original_scale_from_predictive(y_out_of_sample)
+    forecast_dates, y_scale = _forecast_y_scale(x_out_of_sample, y_out_original_scale)
+
+    mean = y_scale.mean(dim=("chain", "draw"))
+    hdi_ds = az.hdi(y_scale, hdi_prob=hdi_prob)
+
+    # az.hdi returns a Dataset; pick the sole data variable when needed.
+    if isinstance(hdi_ds, xr.Dataset):
+        hdi_da = next(iter(hdi_ds.data_vars.values()))
+    else:
+        hdi_da = hdi_ds
+
+    if "hdi" in hdi_da.dims:
+        hdi_lower = hdi_da.sel(hdi="lower")
+        hdi_upper = hdi_da.sel(hdi="higher")
+    else:
+        # Fallback when HDI is returned as (..., 2) along the last axis.
+        hdi_lower = hdi_da.isel({hdi_da.dims[-1]: 0})
+        hdi_upper = hdi_da.isel({hdi_da.dims[-1]: -1})
+
+    rows = []
+    for date in forecast_dates:
+        rows.append(
+            {
+                "date": pd.Timestamp(date).to_pydatetime().replace(tzinfo=None),
+                "mean": float(mean.sel(date=date).values),
+                "hdi_lower": float(hdi_lower.sel(date=date).values),
+                "hdi_upper": float(hdi_upper.sel(date=date).values),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def plot_out_of_sample(
     x: pd.DataFrame,
     y: pd.DataFrame | pd.Series,
@@ -133,30 +203,15 @@ def plot_out_of_sample(
 
     logger.info("Plotting forecasted value line chart...")
 
-    forecast_dates = pd.DatetimeIndex(pd.to_datetime(x_out_of_sample["date"]))
-    y_scale = y_out_original_scale
-    if "date" in y_scale.dims:
-        y_scale = y_scale.assign_coords(
-            date=pd.to_datetime(y_scale.coords["date"].values)
-        )
-        overlap = pd.DatetimeIndex(y_scale.coords["date"].values).intersection(
-            forecast_dates
-        )
-        if len(overlap) == 0:
-            raise ValueError(
-                "No overlapping dates between predictive output and "
-                f"x_out_of_sample. predictive={list(y_scale.coords['date'].values)} "
-                f"forecast={list(forecast_dates)}"
-            )
-        y_scale = y_scale.sel(date=overlap)
-        forecast_dates = overlap
+    forecast_dates, y_scale = _forecast_y_scale(x_out_of_sample, y_out_original_scale)
 
     y_for_hdi = (
         y_scale.stack(sample=("chain", "draw")).transpose("sample", "date").values
     )
     az.plot_hdi(
         forecast_dates.to_numpy(),
-        y_for_hdi,
+        y_scale,
+        # y_for_hdi,
         smooth=False,
         fill_kwargs={"alpha": 0.25, "color": "C0"},
         ax=ax,
